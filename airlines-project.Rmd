@@ -1,0 +1,199 @@
+---
+title: "Airlines Project"
+author: "Łukasz Chrostowski"
+date: "2023 Kwiecień"
+output: pdf_document
+---
+
+# Opis projektu
+Celem projektu jest przekrojowa analiza danych lotniczych związanych z opóźnienami lotów pochodzących USA i mierzonych w lipcu 2017 roku. Zadania zostały wykonane w ramch kursu `SQL w Analizie danych` na kierunku `Analiza i przetwarzanie danych` prowadzonego na Wydziale Matematyki i Informatyki Uniwersytetu im. Adama Mickiewicza. Projekt został podzielony na dwie części w zależności od typu zadań i analiz do przeprowadzenia. Niniejszy dokument przedstawia pierwszą z nich.
+
+# Zadania
+Na wstępie warto załadować wymaganie pakiety do obsługi składni `SQL`.
+Następnie tworzymy obiekt do korzystania z bazy danych oraz pisania zapytań.
+
+```{r, warning=FALSE}
+library(DBI)
+library(RPostgres)
+con <- dbConnect(RPostgres::Postgres(),
+                 dbname = "dwbd_flights",
+                 host = "psql.wmi.amu.edu.pl",
+                 user = rstudioapi::askForPassword(prompt = "Database user"),
+                 password = rstudioapi::askForPassword(prompt = "Database password")
+)
+```
+Rozwiązania są następujące:
+
+## Zadanie 1
+```{sql connection=con}
+SELECT avg(arr_delay_new) AS avg_delay
+FROM "Flight_delays";
+```
+## Zadanie 2
+```{sql connection=con}
+SELECT max(arr_delay_new) AS max_delay
+FROM "Flight_delays";
+```
+
+## Zadanie 3
+```{sql connection=con}
+SELECT carrier,
+       origin_city_name,
+       dest_city_name,
+       fl_date,
+       arr_delay_new
+FROM "Flight_delays"
+WHERE arr_delay_new IS NOT NULL
+ORDER BY arr_delay_new DESC
+LIMIT 1;
+```
+
+## Zadanie 4
+```{sql connection=con}
+SELECT CASE day_of_week
+                WHEN 1 THEN 'Monday'
+                WHEN 2 THEN 'Tuesday'
+                WHEN 3 THEN 'Wednesday'
+                WHEN 4 THEN 'Thursday'
+                WHEN 5 THEN 'Friday'
+                WHEN 6 THEN 'Satrurday'
+                WHEN 7 THEN 'Sunday'
+        END AS weekday_name,
+       avg(arr_delay_new) AS avg_delay
+FROM "Flight_delays"
+GROUP BY day_of_week
+ORDER BY avg_delay DESC;
+```
+
+## Zadanie 5
+```{sql connection=con}
+SELECT DISTINCT T.airline_name,
+       T.avg_delay
+FROM
+(
+SELECT A.airline_name,
+       avg(arr_delay_new) AS avg_delay
+FROM "Flight_delays" F
+    INNER  JOIN "Airlines" A
+        ON A.airline_id = F.airline_id
+WHERE A.airline_id IS NOT null
+GROUP BY A.airline_name
+) AS T
+INNER JOIN "Airlines" A1
+ON A1.airline_name = T.airline_name
+INNER JOIN "Flight_delays" F1
+ON F1.airline_id = A1.airline_id 
+WHERE F1.origin = 'SFO'
+ORDER BY avg_delay DESC;
+```
+
+## Zadanie 6
+```{sql connection=con}
+WITH
+  T1 AS (
+    SELECT COUNT(average_late) AS count10
+    FROM (
+      SELECT AVG(arr_delay_new) AS average_late
+      FROM "Flight_delays"
+      GROUP BY airline_id
+      ) AS T
+    WHERE T.average_late > 10
+  ),
+  T2 AS (
+    SELECT COUNT(average_late) AS tot_count
+    FROM (
+      SELECT AVG(arr_delay_new) AS average_late
+      FROM "Flight_delays"
+      GROUP BY airline_id
+      ) AS T
+  )
+SELECT 
+  CAST(T1.count10 AS FLOAT) / T2.tot_count AS late_proporstion
+FROM 
+  T1, 
+  T2;
+```
+
+## Zadanie 7
+```{sql connection=con}
+SELECT (dep_arr_mean - arr_mean * dep_mean) / (arr_std * dep_std) AS "Pearson r"
+FROM 
+(SELECT avg(arr_delay_new) AS arr_mean,
+       avg(dep_delay_new) AS dep_mean,
+       avg(arr_delay_new * dep_delay_new) AS dep_arr_mean,
+       stddev(arr_delay_new) AS arr_std,
+       stddev(dep_delay_new) AS dep_std
+FROM "Flight_delays") AS T;
+```
+
+## Zadanie 8
+```{sql connection=con}
+WITH 
+T1 AS 
+( 
+SELECT A.airline_name,
+       avg(F.arr_delay_new) AS mean
+FROM "Flight_delays" F
+INNER JOIN "Airlines" A 
+ON A.airline_id = F.airline_id
+WHERE day_of_month < 24
+GROUP BY A.airline_name
+), T2 
+AS 
+(
+SELECT A.airline_name,
+       avg(F.arr_delay_new) AS mean
+FROM "Flight_delays" F
+INNER JOIN "Airlines" A 
+ON A.airline_id = F.airline_id
+WHERE day_of_month >= 24
+GROUP BY A.airline_name
+)
+SELECT  T1.airline_name,
+        T2.mean - T1.mean AS delay_increase
+FROM T1
+INNER JOIN T2
+ON T1.airline_name = T2.airline_name
+where T2.mean - T1.mean >= ALL (SELECT T2.mean - T1.mean
+                                FROM T1 
+                                INNER JOIN T2
+                                ON T1.airline_name = T2.airline_name);
+```
+
+## Zadanie 9
+```{sql connection=con}
+WITH 
+T1 AS 
+(
+SELECT DISTINCT(A.airline_name)
+FROM "Flight_delays" F
+INNER JOIN "Airlines" A 
+ON F.airline_id = A.airline_id
+WHERE origin = 'SFO' AND dest = 'PDX'
+), T2
+AS
+(
+SELECT DISTINCT(A.airline_name)
+FROM "Flight_delays" F
+INNER JOIN "Airlines" A 
+ON F.airline_id = A.airline_id
+WHERE origin = 'SFO' AND dest = 'EUG'
+)
+SELECT T1.airline_name
+FROM T1 
+INNER JOIN T2 
+ON T1.airline_name = T2.airline_name;
+```
+
+## Zadanie 10
+```{sql connection=con}
+SELECT origin,
+       dest,
+       avg(arr_delay_new) AS mean
+FROM "Flight_delays"
+WHERE crs_dep_time > 1400 AND (origin = 'MDW' OR origin = 'ORD') AND (dest = 'SFO' OR dest = 'SJC' OR dest = 'OAK')
+GROUP BY origin, dest
+ORDER BY avg(arr_delay_new) desc;
+```
+
+
