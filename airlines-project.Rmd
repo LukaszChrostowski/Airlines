@@ -22,20 +22,20 @@ con <- dbConnect(RPostgres::Postgres(),
                  password = rstudioapi::askForPassword(prompt = "Database password")
 )
 ```
-Rozwiązania są następujące:
+Kilka statystyk dotyczących opóźnień lotów:
 
-## Zadanie 1
+## Jakie było średnie opóźnienie przylotu?
 ```{sql connection=con}
 SELECT avg(arr_delay_new) AS avg_delay
 FROM "Flight_delays";
 ```
-## Zadanie 2
+## Jakie było maksymalne opóźnienie przylotu?
 ```{sql connection=con}
 SELECT max(arr_delay_new) AS max_delay
 FROM "Flight_delays";
 ```
 
-## Zadanie 3
+## Który lot miał największe opóźnienie przylotu?
 ```{sql connection=con}
 SELECT carrier,
        origin_city_name,
@@ -48,7 +48,7 @@ ORDER BY arr_delay_new DESC
 LIMIT 1;
 ```
 
-## Zadanie 4
+## Które dni tygodnia są najgorsze do podróżowania?
 ```{sql connection=con}
 SELECT CASE day_of_week
                 WHEN 1 THEN 'Monday'
@@ -65,7 +65,7 @@ GROUP BY day_of_week
 ORDER BY avg_delay DESC;
 ```
 
-## Zadanie 5
+## Które linie lotnicze latające z San Francisco (SFO) mają najmniejsze opóźnienia przylotu?
 ```{sql connection=con}
 SELECT DISTINCT T.airline_name,
        T.avg_delay
@@ -87,7 +87,7 @@ WHERE F1.origin = 'SFO'
 ORDER BY avg_delay DESC;
 ```
 
-## Zadanie 6
+## Jaka część linii lotniczych ma regularne opóźnienia, tj. jej lot ma średnio co najmniej 10 min. opóźnienia?
 ```{sql connection=con}
 WITH
   T1 AS (
@@ -114,7 +114,7 @@ FROM
   T2;
 ```
 
-## Zadanie 7
+## Jak opóźnienia wylotów wpływają na opóźnienia przylotów?
 ```{sql connection=con}
 SELECT (dep_arr_mean - arr_mean * dep_mean) / (arr_std * dep_std) AS "Pearson r"
 FROM 
@@ -126,7 +126,7 @@ FROM
 FROM "Flight_delays") AS T;
 ```
 
-## Zadanie 8
+## Która linia lotnicza miała największy wzrost (różnica) średniego opóźnienia przylotów w ostatnim tygodniu miesiąca, tj. między 1-23 a 24-31 lipca?
 ```{sql connection=con}
 WITH 
 T1 AS 
@@ -160,7 +160,7 @@ where T2.mean - T1.mean >= ALL (SELECT T2.mean - T1.mean
                                 ON T1.airline_name = T2.airline_name);
 ```
 
-## Zadanie 9
+## Które linie lotnicze latają zarówno na trasie SFO → PDX (Portland), jak i SFO → EUG (Eugene)?
 ```{sql connection=con}
 WITH 
 T1 AS 
@@ -185,7 +185,7 @@ INNER JOIN T2
 ON T1.airline_name = T2.airline_name;
 ```
 
-## Zadanie 10
+## Jak najszybciej dostać się z Chicago do Stanfordu, zakładając wylot po 14:00 czasu lokalnego?
 ```{sql connection=con}
 SELECT origin,
        dest,
@@ -195,5 +195,3 @@ WHERE crs_dep_time > 1400 AND (origin = 'MDW' OR origin = 'ORD') AND (dest = 'SF
 GROUP BY origin, dest
 ORDER BY avg(arr_delay_new) desc;
 ```
-
-
