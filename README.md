@@ -1,2 +1,2 @@
-# Airlines
-Project in SQL related to airlines data analysis
+# SQL
+Projects in SQL related to airlines and music store data analysis.
